@@ -1,1 +1,42 @@
-./app/.env
+# --- General ---
+.DS_Store
+*.log
+*.pyc
+*.pyo
+__pycache__/
+.env
+.env.local
+.vscode/
+.idea/
+
+# --- Python / FastAPI Backend ---
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.coverage
+.tox/
+database.db  # Ignore SQLite database files if used locally
+serviceAccountKey.json  # Firebase service key (DO NOT COMMIT!)
+
+# --- Logs and Debug Files ---
+logs/
+*.log
+
+# --- Deployment & Docker ---
+*.swp
+*.swo
+*.bak
+*.pid
+docker-compose.override.yml
+
+# --- Ignore IDE-specific files ---
+.vscode/
+.idea/
+*.iml
+
+# --- Ignore CI/CD config files (if needed) ---
+.github/workflows/*
+
