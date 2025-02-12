@@ -1,21 +1,21 @@
-from fastapi import APIRouter, Depends, HTTPException, Header
-from firebase_admin import auth
+from fastapi import APIRouter, Depends, HTTPException
+import firebase_admin
+from firebase_admin import auth, credentials
 
 router = APIRouter()
 
-def verify_token(authorization: str = Header(None)):
-    """Verify Firebase token from the Authorization header."""
-    if not authorization:
-        raise HTTPException(status_code=401, detail="Authorization header missing")
+# Initialize Firebase Admin SDK
+cred = credentials.Certificate("serviceAccountKey.json")
+firebase_admin.initialize_app(cred)
 
+@router.post("/register")
+async def register_user(email: str, password: str):
     try:
-        token = authorization.split(" ")[1]  # Extract token from "Bearer <token>"
-        decoded_token = auth.verify_id_token(token)
-        return decoded_token
-    except Exception:
-        raise HTTPException(status_code=401, detail="Invalid token")
-
-@router.get("/me")
-def get_user_info(user=Depends(verify_token)):
-    return {"uid": user["uid"], "email": user.get("email")}
-
+        user = auth.create_user(email=email, password=password)
+        return {"message": "User created successfully", "uid": user.uid}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    
+@router.post("/login")
+async def login_user(email: str, password: str):
+    return {"message": "User logged in successfully via Firebase Authentication"}

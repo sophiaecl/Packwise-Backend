@@ -1,11 +1,10 @@
-import firebase_admin
-from firebase_admin import credentials, firestore
-from app.config import FIREBASE_CREDENTIALS
+from google.cloud import firestore
 
-# Initialize Firebase with service account credentials
-cred = credentials.Certificate(FIREBASE_CREDENTIALS)
-firebase_admin.initialize_app(cred)
+def get_firestore_client():
+    return firestore.Client()
 
-# Firestore client
-db = firestore.client()
+"""Returns a reference to a Firestore collection"""
+def get_collection(collection_name):
+    db = get_firestore_client()
+    return db.collection(collection_name)
 

@@ -4,13 +4,10 @@ from dotenv import load_dotenv
 # Load environment variables from .env
 load_dotenv()
 
-# Firestore Credentials
-FIREBASE_CREDENTIALS = os.getenv("FIREBASE_CREDENTIALS")
+class Config:
+    FIREBASE_API_KEY = os.getenv('FIREBASE_API_KEY')
+    WEATHERSTACK_API_KEY = os.getenv('WEATHERSTACK_API_KEY')
+    CANOPY_API_KEY = os.getenv('CANOPY_API_KEY')
+    DATABASE_URL = os.getenv('DATABASE_URL')
 
-# API Keys
-WEATHERSTACK_API_KEY = os.getenv("WEATHERSTACK_API_KEY")
-CANOPY_API_KEY = os.getenv("CANOPY_API_KEY")
-
-# Debug Mode
-DEBUG = os.getenv("DEBUG", "False").lower() == "true"
-
+config = Config()
