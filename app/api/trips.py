@@ -76,3 +76,24 @@ async def get_trip(trip_id: str):
 
     return trip_data
 
+@router.delete("/delete/{trip_id}")
+async def delete_trip(request: Request, trip_id: str):
+    user = request.session.get("user") 
+    if not user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
+    try:
+        query = f"""
+        DELETE FROM `{TRIP_DATASET_ID}.{TRIP_TABLE_ID}`
+        WHERE trip_id = @trip_id AND username = @username
+        """
+        job_config = bigquery.QueryJobConfig(
+            query_parameters=[
+                bigquery.ScalarQueryParameter("trip_id", "STRING", trip_id),
+                bigquery.ScalarQueryParameter("username", "STRING", user),
+            ]
+        )
+        client.query(query, job_config=job_config).result()
+        return {"message": "Trip deleted successfully"}
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+
