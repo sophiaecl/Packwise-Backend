@@ -31,11 +31,11 @@ async def create_trip(request: Request,trip: Trip):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
     try:
         trip_data = trip.dict()
-        trip_data["username"] = user
+        trip_data["user_id"] = user
         trip_data["trip_id"] = str(uuid.uuid4())  # Generate a unique trip ID
 
         rows_to_insert = [{
-            "username": trip_data["username"],
+            "user_id": trip_data["user_id"],
             "trip_id": trip_data["trip_id"],
             "start_date": trip_data["start_date"],
             "end_date": trip_data["end_date"],
@@ -52,10 +52,11 @@ async def create_trip(request: Request,trip: Trip):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+# NEED TO ADD ACCESS TO WEATHER DATA WHEN TRIP IS OPENED
 @router.get("/{trip_id}")
 async def get_trip(trip_id: str):
     query = f"""
-        SELECT trip_id, city, country, start_date, end_date, luggage_type, trip_purpose, username
+        SELECT trip_id, city, country, start_date, end_date, luggage_type, trip_purpose, user_id
         FROM `{TRIP_DATASET_ID}.{TRIP_TABLE_ID}`
         WHERE trip_id = @trip_id
     """
@@ -84,19 +85,21 @@ async def delete_trip(request: Request, trip_id: str):
     try:
         query = f"""
         DELETE FROM `{TRIP_DATASET_ID}.{TRIP_TABLE_ID}`
-        WHERE trip_id = @trip_id AND username = @username
+        WHERE trip_id = @trip_id AND user_id = @user_id
         """
         job_config = bigquery.QueryJobConfig(
             query_parameters=[
                 bigquery.ScalarQueryParameter("trip_id", "STRING", trip_id),
-                bigquery.ScalarQueryParameter("username", "STRING", user),
+                bigquery.ScalarQueryParameter("user_id", "STRING", user),
             ]
         )
         client.query(query, job_config=job_config).result()
         return {"message": "Trip deleted successfully"}
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
-    
+
+
+# NEED TO MAKE THE DEFAULT VALUES IN THE DICTIONARY TO THE VALUES ALREADY IN THE DATABASE 
 @router.put("/update/{trip_id}")
 async def update_trip(request: Request, trip_id: str, trip: Trip):
     user = request.session.get("user")
@@ -112,7 +115,7 @@ async def update_trip(request: Request, trip_id: str, trip: Trip):
             end_date = @end_date,
             luggage_type = @luggage_type,
             trip_purpose = @trip_purpose
-        WHERE trip_id = @trip_id AND username = @username
+        WHERE trip_id = @trip_id AND user_id = @user_id
         """
         job_config = bigquery.QueryJobConfig(
             query_parameters=[
@@ -123,7 +126,7 @@ async def update_trip(request: Request, trip_id: str, trip: Trip):
                 bigquery.ScalarQueryParameter("luggage_type", "STRING", trip_data["luggage_type"]),
                 bigquery.ScalarQueryParameter("trip_purpose", "STRING", trip_data["trip_purpose"]),
                 bigquery.ScalarQueryParameter("trip_id", "STRING", trip_id),
-                bigquery.ScalarQueryParameter("username", "STRING", user),
+                bigquery.ScalarQueryParameter("user_id", "STRING", user),
             ]
         )
         client.query(query, job_config=job_config).result()

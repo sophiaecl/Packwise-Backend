@@ -10,8 +10,8 @@ class Config:
     SECRET_KEY = "a1b2c3d4e5f67890abcdef1234567890abcdefabcdefabcdefabcdefabcdef1234"
     USER_DATASET_ID = "capstone-sophiallamas.Users"
     TRIP_DATASET_ID = "capstone-sophiallamas.Trips"
-    USERNAME_TABLE_ID = "user_login"
-    USER_INFO_TABLE_ID = "user_info"
-    TRIP_TABLE_ID = "trips"
+    USERNAME_TABLE_ID = "users"
+    USER_INFO_TABLE_ID = "users_info"
+    TRIP_TABLE_ID = "user_trips"
 
 config = Config()
