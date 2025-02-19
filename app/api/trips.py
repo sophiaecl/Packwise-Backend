@@ -76,3 +76,58 @@ async def get_trip(trip_id: str):
 
     return trip_data
 
+@router.delete("/delete/{trip_id}")
+async def delete_trip(request: Request, trip_id: str):
+    user = request.session.get("user") 
+    if not user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
+    try:
+        query = f"""
+        DELETE FROM `{TRIP_DATASET_ID}.{TRIP_TABLE_ID}`
+        WHERE trip_id = @trip_id AND username = @username
+        """
+        job_config = bigquery.QueryJobConfig(
+            query_parameters=[
+                bigquery.ScalarQueryParameter("trip_id", "STRING", trip_id),
+                bigquery.ScalarQueryParameter("username", "STRING", user),
+            ]
+        )
+        client.query(query, job_config=job_config).result()
+        return {"message": "Trip deleted successfully"}
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+    
+@router.put("/update/{trip_id}")
+async def update_trip(request: Request, trip_id: str, trip: Trip):
+    user = request.session.get("user")
+    if not user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
+    try:
+        trip_data = trip.dict()
+        query = f"""
+        UPDATE `{TRIP_DATASET_ID}.{TRIP_TABLE_ID}`
+        SET city = @city,
+            country = @country,
+            start_date = @start_date,
+            end_date = @end_date,
+            luggage_type = @luggage_type,
+            trip_purpose = @trip_purpose
+        WHERE trip_id = @trip_id AND username = @username
+        """
+        job_config = bigquery.QueryJobConfig(
+            query_parameters=[
+                bigquery.ScalarQueryParameter("city", "STRING", trip_data["city"]),
+                bigquery.ScalarQueryParameter("country", "STRING", trip_data["country"]),
+                bigquery.ScalarQueryParameter("start_date", "STRING", trip_data["start_date"]),
+                bigquery.ScalarQueryParameter("end_date", "STRING", trip_data["end_date"]),
+                bigquery.ScalarQueryParameter("luggage_type", "STRING", trip_data["luggage_type"]),
+                bigquery.ScalarQueryParameter("trip_purpose", "STRING", trip_data["trip_purpose"]),
+                bigquery.ScalarQueryParameter("trip_id", "STRING", trip_id),
+                bigquery.ScalarQueryParameter("username", "STRING", user),
+            ]
+        )
+        client.query(query, job_config=job_config).result()
+        return {"message": "Trip updated successfully"}
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+
