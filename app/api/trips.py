@@ -31,11 +31,11 @@ async def create_trip(request: Request,trip: Trip):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
     try:
         trip_data = trip.dict()
-        trip_data["username"] = user
+        trip_data["user_id"] = user
         trip_data["trip_id"] = str(uuid.uuid4())  # Generate a unique trip ID
 
         rows_to_insert = [{
-            "username": trip_data["username"],
+            "user_id": trip_data["user_id"],
             "trip_id": trip_data["trip_id"],
             "start_date": trip_data["start_date"],
             "end_date": trip_data["end_date"],

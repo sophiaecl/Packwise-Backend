@@ -4,6 +4,7 @@ from starlette.responses import RedirectResponse
 from passlib.context import CryptContext
 from google.cloud import bigquery
 import os
+import uuid
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -36,8 +37,10 @@ async def register(username: str = Form(...), password: str = Form(...)):
         raise HTTPException(status_code=400, detail="Username already exists")
 
     hashed_password = pwd_context.hash(password)
+    user_id = str(uuid.uuid4())
+
     rows_to_insert = [
-        {u"username": username, u"password": hashed_password}
+        {u"id": user_id, u"username": username, u"password": hashed_password}
     ]
     errors = client.insert_rows_json(table_ref, rows_to_insert)
     if errors:
@@ -48,7 +51,7 @@ async def register(username: str = Form(...), password: str = Form(...)):
 # User Login Endpoint
 @router.post("/login")
 async def login(request: Request, username: str = Form(...), password: str = Form(...)):
-    query = f"SELECT username, password FROM `{dataset_id}.{table_id}` WHERE username = @username"
+    query = f"SELECT id, username, password FROM `{dataset_id}.{table_id}` WHERE username = @username"
     job_config = bigquery.QueryJobConfig(
         query_parameters=[
             bigquery.ScalarQueryParameter("username", "STRING", username)
@@ -65,7 +68,7 @@ async def login(request: Request, username: str = Form(...), password: str = For
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
 
     # Set session
-    request.session["user"] = username
+    request.session["user"] = user_data["id"]
 
     return RedirectResponse(url="/dashboard", status_code=status.HTTP_303_SEE_OTHER)
 
