@@ -6,6 +6,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+# get all environment variables
 TRIP_DATASET_ID = os.getenv("TRIP_DATASET_ID")
 TRIP_TABLE_ID = os.getenv("TRIP_TABLE_ID")
 USER_DATASET_ID = os.getenv("USER_DATASET_ID")
@@ -13,23 +14,29 @@ USER_INFO_TABLE_ID = os.getenv("USER_INFO_TABLE_ID")
 
 router = APIRouter()
 
+# create  bigquery client
 client = bigquery.Client()
 dataset_id = TRIP_DATASET_ID
 table_id = TRIP_TABLE_ID
 
-# Protected Dashboard Endpoint
+# protected dashboard endpoint
 @router.get("/")
 async def dashboard(request: Request):
+    # authenticates user before displaying the dashboard
     user = request.session.get("user")
-
     if not user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
     
+    # call get name function to get the user's name based on user id
     name = await get_name(user)
+    # call get user trips function to get the user's trips based on user id
     trips = await get_user_trips(user)
+    # returns the user's name and trips
     return {"message": f"Welcome to your dashboard, {name}!", "trips": trips} 
 
+# get user's name based on user id
 async def get_name(user_id: str):
+    # query to get the user's name based on user id
     query = f"""
         SELECT name
         FROM `{USER_DATASET_ID}.{USER_INFO_TABLE_ID}`
@@ -41,14 +48,16 @@ async def get_name(user_id: str):
         ]
     )
     query_job = client.query(query, job_config=job_config)
+    # result is all user info
     results = query_job.result()
 
     if results.total_rows == 0:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
-
+    # take name from the results
     user_data = [row for row in results][0]
     return user_data["name"]
 
+# get user's trips based on user id
 async def get_user_trips(user_id: str):
     query = f"""
         SELECT trip_id, city, country, start_date, end_date, luggage_type, trip_purpose
