@@ -13,5 +13,6 @@ class Config:
     USERNAME_TABLE_ID = "users"
     USER_INFO_TABLE_ID = "users_info"
     TRIP_TABLE_ID = "user_trips"
+    TRIP_WEATHER_TABLE_ID = "trip_weather"
 
 config = Config()
