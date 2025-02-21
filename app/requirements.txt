@@ -1,14 +1,12 @@
 fastapi
 uvicorn
-firebase-admin
-google-cloud-firestore
 google-cloud-bigquery
 python-dotenv
 requests
 pytest
-gunicorn
 pydantic
 typing
 passlib[bcrypt]
 python-multipart
 bcrypt
+db-dtypes>=1.0.0
