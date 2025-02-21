@@ -42,7 +42,6 @@ async def generate_packing_list_route(trip_id: str):
 
 @router.get("/{packing_list_id}")
 async def get_packing_list(list_id: str):
-    """Fetches the packing list for a trip."""
     query = f'''
         SELECT packing_list FROM `{TRIP_DATASET_ID}.{PACKING_TABLE_ID}` WHERE list_id = '{list_id}'
     '''
