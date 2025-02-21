@@ -19,7 +19,7 @@ router = APIRouter()
 client = bigquery.Client()
 
 # generates a packing list based on trip details
-@router.post("/{trip_id}/generate")
+@router.post("/generate/{trip_id}")
 async def generate_packing_list_route(trip_id: str):
     try:
         packing_list = str(generate_packing_list(trip_id))[7:-3]
@@ -40,7 +40,7 @@ async def generate_packing_list_route(trip_id: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.get("/{trip_id}/{packing_list_id}")
+@router.get("/{packing_list_id}")
 async def get_packing_list(list_id: str):
     """Fetches the packing list for a trip."""
     query = f'''
