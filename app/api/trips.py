@@ -112,12 +112,10 @@ async def get_trip(trip_id: str):
         raise HTTPException(status_code=404, detail="Trip not found")
 
     trip_data = [row for row in results][0]
-    # weather_data = fetch_weather(trip_data["city"])
-    # trip_data["weather_info"] = weather_data
 
     return trip_data
 
-# NEED TO DELETE DATA FROM TRIP WEATHER TABLE WHEN TRIP IS DELETED
+# NEED TO DELETE DATA FROM TRIP WEATHER AND PACKING LISTS TABLE WHEN TRIP IS DELETED
 @router.delete("/delete/{trip_id}")
 async def delete_trip(request: Request, trip_id: str):
     user = request.session.get("user") 
