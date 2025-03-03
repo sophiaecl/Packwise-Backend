@@ -1,5 +1,5 @@
-from fastapi import APIRouter, HTTPException, status, Form, Depends
-from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from fastapi import APIRouter, HTTPException, status, Form, Depends, Security
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials, OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from passlib.context import CryptContext
 from google.cloud import bigquery
 from typing import Optional
@@ -23,7 +23,12 @@ USER_INFO_TABLE_ID = os.getenv("USER_INFO_TABLE_ID")
 router = APIRouter()
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+
+# Use OAuth2PasswordBearer for token handling
+oauth2_scheme = OAuth2PasswordBearer(
+    tokenUrl="/auth/token",  # Full path including prefix
+    scheme_name="JWT",
+)
 
 client = bigquery.Client()
 dataset_id = USER_DATASET_ID
@@ -54,8 +59,12 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
         user_id: str = payload.get("sub")
         if user_id is None:
             raise credentials_exception
-    except JWTError:
-        raise credentials_exception
+    except JWTError as e:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=f"Invalid token: {str(e)}",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
     
     # Verify user exists in database
     query = f"SELECT id FROM `{dataset_id}.{user_table_id}` WHERE id = @user_id"
@@ -73,7 +82,9 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
     return user_id
 
 # User Registration Endpoint
-@router.post("/register")
+@router.post("/register",
+    summary="Register new user",
+    description="Create a new user account. After registration, use the /token endpoint to get an access token.")
 async def register(username: str = Form(...), password: str = Form(...), name: str = Form(...), age: int = Form(...), gender: Optional[str] = Form(None)):
     query = f"SELECT username FROM `{dataset_id}.{user_table_id}` WHERE username = @username"
     job_config = bigquery.QueryJobConfig(
@@ -111,7 +122,19 @@ async def register(username: str = Form(...), password: str = Form(...), name: s
     return {"message": "User registered successfully"}
 
 # Token endpoint for login
-@router.post("/token")
+@router.post("/token", 
+    summary="Get access token",
+    description="""
+    Use this endpoint to get a JWT access token for authentication.
+    
+    Steps to use:
+    1. Enter your username and password
+    2. Click Execute
+    3. Copy the access_token from the response
+    4. Click the 'Authorize' button at the top of the page
+    5. In the popup, paste ONLY the token (without 'Bearer')
+    6. Click Authorize
+    """)
 async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends()):
     query = f"SELECT id, username, password FROM `{dataset_id}.{user_table_id}` WHERE username = @username"
     job_config = bigquery.QueryJobConfig(
@@ -144,6 +167,8 @@ async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(
     return {"access_token": access_token, "token_type": "bearer"}
 
 # Logout endpoint (client-side should remove the token)
-@router.post("/logout")
+@router.post("/logout",
+    summary="Logout user",
+    description="This endpoint is for client-side use. The client should remove the stored token.")
 async def logout():
     return {"message": "Successfully logged out"}
