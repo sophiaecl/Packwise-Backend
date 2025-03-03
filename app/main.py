@@ -1,7 +1,7 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from app.api import auth, trips, dashboard, packing
 #packing, weather, shopping, dashboard
-from starlette.middleware.sessions import SessionMiddleware
 import os
 from dotenv import load_dotenv
 
@@ -9,8 +9,14 @@ load_dotenv()
 
 app = FastAPI(title="PackWise API", description="Backend for PackWise travel assistant.", version="1.0")
 
-# Adds session middleware with a secure secret key
-app.add_middleware(SessionMiddleware, secret_key=os.getenv("SECRET_KEY"))
+# Configure CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000"],  # Add your React frontend URL
+    allow_credentials=True,
+    allow_methods=["*"],  # Allows all methods
+    allow_headers=["*"],  # Allows all headers
+)
 
 # Register routers
 app.include_router(auth.router, prefix="/auth", tags=["Authentication"])

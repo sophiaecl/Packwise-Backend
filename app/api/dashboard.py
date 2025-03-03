@@ -1,8 +1,8 @@
-from fastapi import APIRouter, HTTPException, status
-from starlette.requests import Request
+from fastapi import APIRouter, HTTPException, status, Depends
 from google.cloud import bigquery
 import os 
 from dotenv import load_dotenv
+from .auth import get_current_user
 
 load_dotenv()
 
@@ -21,16 +21,11 @@ table_id = TRIP_TABLE_ID
 
 # protected dashboard endpoint
 @router.get("/")
-async def dashboard(request: Request):
-    # authenticates user before displaying the dashboard
-    user = request.session.get("user")
-    if not user:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
-    
+async def dashboard(current_user: str = Depends(get_current_user)):
     # call get name function to get the user's name based on user id
-    name = await get_name(user)
+    name = await get_name(current_user)
     # call get user trips function to get the user's trips based on user id
-    trips = await get_user_trips(user)
+    trips = await get_user_trips(current_user)
     # returns the user's name and trips
     return {"message": f"Welcome to your dashboard, {name}!", "trips": trips} 
 

@@ -1,9 +1,9 @@
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, status, Depends
 from pydantic import BaseModel
-from starlette.requests import Request
 from typing import Literal
 from google.cloud import bigquery
 from app.services.weather_predictor import WeatherPredictor
+from app.api.auth import get_current_user
 import uuid
 import os 
 from dotenv import load_dotenv
@@ -33,15 +33,11 @@ class Trip(BaseModel):
 # inserts trip data into the trip information table and the trip weather table
 # calls the WeatherPredictor class to predict the weather for the trip
 @router.post("/")
-async def create_trip(request: Request,trip: Trip):
-    # makes sure user is authenticated before creating a trip
-    user = request.session.get("user")  
-    if not user:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
+async def create_trip(trip: Trip, current_user: str = Depends(get_current_user)):
     try:
         # creates trip object from the request data
         trip_data = trip.dict()
-        trip_data["user_id"] = user # gets user id from the session
+        trip_data["user_id"] = current_user  # gets user id from JWT token
         trip_data["trip_id"] = str(uuid.uuid4())  # generate a unique trip ID
 
         trip_info_rows = [{
@@ -117,10 +113,7 @@ async def get_trip(trip_id: str):
 
 # NEED TO DELETE DATA FROM TRIP WEATHER AND PACKING LISTS TABLE WHEN TRIP IS DELETED
 @router.delete("/delete/{trip_id}")
-async def delete_trip(request: Request, trip_id: str):
-    user = request.session.get("user") 
-    if not user:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
+async def delete_trip(trip_id: str, current_user: str = Depends(get_current_user)):
     try:
         query = f"""
         DELETE FROM `{TRIP_DATASET_ID}.{TRIP_TABLE_ID}`
@@ -129,7 +122,7 @@ async def delete_trip(request: Request, trip_id: str):
         job_config = bigquery.QueryJobConfig(
             query_parameters=[
                 bigquery.ScalarQueryParameter("trip_id", "STRING", trip_id),
-                bigquery.ScalarQueryParameter("user_id", "STRING", user),
+                bigquery.ScalarQueryParameter("user_id", "STRING", current_user),
             ]
         )
         client.query(query, job_config=job_config).result()
@@ -140,10 +133,7 @@ async def delete_trip(request: Request, trip_id: str):
 
 # NEED TO MAKE THE DEFAULT VALUES IN THE DICTIONARY TO THE VALUES ALREADY IN THE DATABASE 
 @router.put("/update/{trip_id}")
-async def update_trip(request: Request, trip_id: str, trip: Trip):
-    user = request.session.get("user")
-    if not user:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
+async def update_trip(trip_id: str, trip: Trip, current_user: str = Depends(get_current_user)):
     try:
         trip_data = trip.dict()
         query = f"""
@@ -165,7 +155,7 @@ async def update_trip(request: Request, trip_id: str, trip: Trip):
                 bigquery.ScalarQueryParameter("luggage_type", "STRING", trip_data["luggage_type"]),
                 bigquery.ScalarQueryParameter("trip_purpose", "STRING", trip_data["trip_purpose"]),
                 bigquery.ScalarQueryParameter("trip_id", "STRING", trip_id),
-                bigquery.ScalarQueryParameter("user_id", "STRING", user),
+                bigquery.ScalarQueryParameter("user_id", "STRING", current_user),
             ]
         )
         client.query(query, job_config=job_config).result()
