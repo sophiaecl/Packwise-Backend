@@ -10,3 +10,4 @@ passlib[bcrypt]
 python-multipart
 bcrypt
 db-dtypes>=1.0.0
+python-jose[cryptography]
