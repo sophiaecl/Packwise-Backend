@@ -7,10 +7,11 @@ WORKDIR /app
 
 # Step 3: Copy requirements.txt and install dependencies
 COPY requirements.txt /app/requirements.txt
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir -r /app/requirements.txt
 
 # Step 4: Copy your application code into the container
 COPY . /app
+COPY .env /app/.env
 
 # Step 5: Expose the port that the FastAPI app will run on
 EXPOSE 8080
