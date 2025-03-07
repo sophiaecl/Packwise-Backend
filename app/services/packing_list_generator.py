@@ -13,7 +13,7 @@ USER_INFO_TABLE_ID = os.getenv("USER_INFO_TABLE_ID")
 TRIP_TABLE_ID = os.getenv("TRIP_TABLE_ID")
 TRIP_WEATHER_TABLE_ID = os.getenv("TRIP_WEATHER_TABLE_ID")
 
-client = bigquery.Client()
+client = bigquery.Client(project="capstone-sophiallamas")
 gemini_client = genai.Client(api_key=GEMINI_API_KEY)
 
 

@@ -30,7 +30,7 @@ oauth2_scheme = OAuth2PasswordBearer(
     scheme_name="JWT",
 )
 
-client = bigquery.Client()
+client = bigquery.Client(project="capstone-sophiallamas")
 dataset_id = USER_DATASET_ID
 user_table_id = USERNAME_TABLE_ID
 user_table_ref = client.dataset(dataset_id).table(user_table_id)

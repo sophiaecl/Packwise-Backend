@@ -15,7 +15,7 @@ USER_INFO_TABLE_ID = os.getenv("USER_INFO_TABLE_ID")
 router = APIRouter()
 
 # create  bigquery client
-client = bigquery.Client()
+client = bigquery.Client(project="capstone-sophiallamas")
 dataset_id = TRIP_DATASET_ID
 table_id = TRIP_TABLE_ID
 

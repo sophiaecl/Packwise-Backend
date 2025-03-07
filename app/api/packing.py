@@ -16,7 +16,7 @@ PACKING_TABLE_ID = os.getenv("PACKING_TABLE_ID")
 
 router = APIRouter()
 
-client = bigquery.Client()
+client = bigquery.Client(project="capstone-sophiallamas")
 
 # generates a packing list based on trip details
 @router.post("/generate/{trip_id}")

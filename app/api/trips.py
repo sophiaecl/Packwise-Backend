@@ -13,7 +13,7 @@ load_dotenv()
 router = APIRouter()
 
 # initialize BigQuery client
-client = bigquery.Client()
+client = bigquery.Client(project="capstone-sophiallamas")
 # get environment variables
 TRIP_DATASET_ID = os.getenv("TRIP_DATASET_ID")
 TRIP_TABLE_ID = os.getenv("TRIP_TABLE_ID")
