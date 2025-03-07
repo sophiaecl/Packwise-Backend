@@ -17,4 +17,4 @@ COPY .env /app/.env
 EXPOSE 8080
 
 # Step 6: Specify the command to run the FastAPI app with Uvicorn
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080"]
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080"]
