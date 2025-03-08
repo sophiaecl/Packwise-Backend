@@ -88,17 +88,17 @@ async def create_trip(trip: Trip, current_user: str = Depends(get_current_user))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-# NEED TO ADD ACCESS TO WEATHER DATA WHEN TRIP IS OPENED
 @router.get("/{trip_id}")
-async def get_trip(trip_id: str):
+async def get_trip(trip_id: str, current_user: str = Depends(get_current_user)):
     query = f"""
         SELECT trip_id, city, country, start_date, end_date, luggage_type, trip_purpose, user_id
         FROM `{TRIP_DATASET_ID}.{TRIP_TABLE_ID}`
-        WHERE trip_id = @trip_id
+        WHERE trip_id = @trip_id AND user_id = @user_id
     """
     job_config = bigquery.QueryJobConfig(
         query_parameters=[
-            bigquery.ScalarQueryParameter("trip_id", "STRING", trip_id)
+            bigquery.ScalarQueryParameter("trip_id", "STRING", trip_id),
+            bigquery.ScalarQueryParameter("user_id", "STRING", current_user)
         ]
     )
     query_job = client.query(query, job_config=job_config)
@@ -110,6 +110,44 @@ async def get_trip(trip_id: str):
     trip_data = [row for row in results][0]
 
     return trip_data
+
+@router.get("/weather/{trip_id}")
+async def get_trip_weather(trip_id: str, current_user: str = Depends(get_current_user)):
+    # First verify that the trip belongs to the user
+    trip_query = f"""
+        SELECT 1
+        FROM `{TRIP_DATASET_ID}.{TRIP_TABLE_ID}`
+        WHERE trip_id = @trip_id AND user_id = @user_id
+    """
+    trip_config = bigquery.QueryJobConfig(
+        query_parameters=[
+            bigquery.ScalarQueryParameter("trip_id", "STRING", trip_id),
+            bigquery.ScalarQueryParameter("user_id", "STRING", current_user)
+        ]
+    )
+    trip_job = client.query(trip_query, trip_config)
+    if trip_job.result().total_rows == 0:
+        raise HTTPException(status_code=404, detail="Trip not found")
+
+    # If trip belongs to user, get weather data
+    query = f"""
+        SELECT *
+        FROM `{TRIP_DATASET_ID}.{TRIP_WEATHER_TABLE_ID}`
+        WHERE trip_id = @trip_id
+    """
+    job_config = bigquery.QueryJobConfig(
+        query_parameters=[
+            bigquery.ScalarQueryParameter("trip_id", "STRING", trip_id)
+        ]
+    )
+    query_job = client.query(query, job_config=job_config)
+    results = query_job.result()
+
+    if results.total_rows == 0:
+        raise HTTPException(status_code=404, detail="Trip weather not found")
+
+    trip_weather_data = [row for row in results][0]
+    return trip_weather_data
 
 # NEED TO DELETE DATA FROM TRIP WEATHER AND PACKING LISTS TABLE WHEN TRIP IS DELETED
 @router.delete("/delete/{trip_id}")
