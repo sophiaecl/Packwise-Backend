@@ -99,3 +99,15 @@ async def get_packing_list(list_id: str, current_user: str = Depends(get_current
         raise HTTPException(status_code=500, detail="Packing list contains invalid JSON format.")
     
     return {"packing_list": packing_list}
+
+@router.get("/lists/{trip_id}")
+async def get_packing_lists(trip_id: str, current_user: str = Depends(get_current_user)):
+    """Fetches all packing lists for a trip."""
+    query = f'''
+        SELECT list_id FROM `{TRIP_DATASET_ID}.{PACKING_TABLE_ID}` WHERE trip_id = '{trip_id}'
+    '''
+    results = client.query(query).to_dataframe()
+    if results.empty:
+        raise HTTPException(status_code=404, detail="No packing lists found for this trip")
+    
+    return {"packing_lists": results.to_dict(orient="records")}
