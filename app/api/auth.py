@@ -8,7 +8,7 @@ import uuid
 from dotenv import load_dotenv
 from datetime import datetime, timedelta
 from jose import JWTError, jwt
-
+from pydantic import BaseModel
 load_dotenv()
 
 # JWT Configuration
@@ -37,6 +37,12 @@ user_table_ref = client.dataset(dataset_id).table(user_table_id)
 
 user_info_id = USER_INFO_TABLE_ID
 user_info_ref = client.dataset(dataset_id).table(user_info_id)
+
+# Create a Pydantic model for profile updates
+class ProfileUpdate(BaseModel):
+    name: Optional[str] = None
+    age: Optional[int] = None
+    gender: Optional[str] = None
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     to_encode = data.copy()
@@ -172,3 +178,70 @@ async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(
     description="This endpoint is for client-side use. The client should remove the stored token.")
 async def logout():
     return {"message": "Successfully logged out"}
+
+@router.put("/profile", 
+    summary="Update user profile",
+    description="Update the current user's profile information")
+async def update_profile(profile: ProfileUpdate, current_user: str = Depends(get_current_user)):
+    """Updates the user's profile information."""
+    try:
+        # Build update query for non-None fields only
+        update_parts = []
+        query_params = [bigquery.ScalarQueryParameter("user_id", "STRING", current_user)]
+        
+        if profile.name is not None:
+            update_parts.append("name = @name")
+            query_params.append(bigquery.ScalarQueryParameter("name", "STRING", profile.name))
+        
+        if profile.age is not None:
+            update_parts.append("age = @age")
+            query_params.append(bigquery.ScalarQueryParameter("age", "INT64", profile.age))
+        
+        if profile.gender is not None:
+            update_parts.append("gender = @gender")
+            query_params.append(bigquery.ScalarQueryParameter("gender", "STRING", profile.gender))
+        
+        if not update_parts:
+            return {"message": "No fields to update"}
+        
+        update_query = f"""
+            UPDATE `{USER_DATASET_ID}.{USER_INFO_TABLE_ID}`
+            SET {", ".join(update_parts)}
+            WHERE user_id = @user_id
+        """
+        
+        job_config = bigquery.QueryJobConfig(query_parameters=query_params)
+        client.query(update_query, job_config=job_config).result()
+        
+        return {"message": "Profile updated successfully"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to update profile: {str(e)}")
+
+# Get user profile endpoint
+@router.get("/profile", 
+    summary="Get user profile",
+    description="Get the current user's profile information")
+async def get_profile(current_user: str = Depends(get_current_user)):
+    """Gets the user's profile information."""
+    query = f"""
+        SELECT name, age, gender
+        FROM `{USER_DATASET_ID}.{USER_INFO_TABLE_ID}`
+        WHERE user_id = @user_id
+    """
+    job_config = bigquery.QueryJobConfig(
+        query_parameters=[
+            bigquery.ScalarQueryParameter("user_id", "STRING", current_user)
+        ]
+    )
+    query_job = client.query(query, job_config=job_config)
+    results = query_job.result()
+
+    if results.total_rows == 0:
+        raise HTTPException(status_code=404, detail="User profile not found")
+    
+    profile = next(results)
+    return {
+        "name": profile.name,
+        "age": profile.age,
+        "gender": profile.gender
+    }

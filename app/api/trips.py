@@ -174,6 +174,24 @@ async def delete_trip(trip_id: str, current_user: str = Depends(get_current_user
 async def update_trip(trip_id: str, trip: Trip, current_user: str = Depends(get_current_user)):
     try:
         trip_data = trip.dict()
+        
+        # First verify that the trip belongs to the user
+        trip_query = f"""
+            SELECT 1
+            FROM `{TRIP_DATASET_ID}.{TRIP_TABLE_ID}`
+            WHERE trip_id = @trip_id AND user_id = @user_id
+        """
+        trip_config = bigquery.QueryJobConfig(
+            query_parameters=[
+                bigquery.ScalarQueryParameter("trip_id", "STRING", trip_id),
+                bigquery.ScalarQueryParameter("user_id", "STRING", current_user)
+            ]
+        )
+        trip_job = client.query(trip_query, trip_config)
+        if trip_job.result().total_rows == 0:
+            raise HTTPException(status_code=404, detail="Trip not found")
+
+        # Update trip information
         query = f"""
         UPDATE `{TRIP_DATASET_ID}.{TRIP_TABLE_ID}`
         SET city = @city,
@@ -197,7 +215,39 @@ async def update_trip(trip_id: str, trip: Trip, current_user: str = Depends(get_
             ]
         )
         client.query(query, job_config=job_config).result()
-        return {"message": "Trip updated successfully"}
+
+        # Get new weather predictions
+        predictor = WeatherPredictor(WEATHERSTACK_API_KEY)
+        try:
+            prediction = predictor.predict_trip_weather(trip_data["city"], trip_data["start_date"], trip_data["end_date"])
+            if not isinstance(prediction, dict):
+                raise HTTPException(status_code=500, detail=f"Failed to predict weather: {prediction}")
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Failed to predict weather: {str(e)}")
+
+        # Update weather data
+        weather_query = f"""
+        UPDATE `{TRIP_DATASET_ID}.{TRIP_WEATHER_TABLE_ID}`
+        SET min_temp = @min_temp,
+            max_temp = @max_temp,
+            uv = @uv,
+            description = @description,
+            confidence = @confidence
+        WHERE trip_id = @trip_id
+        """
+        weather_config = bigquery.QueryJobConfig(
+            query_parameters=[
+                bigquery.ScalarQueryParameter("min_temp", "FLOAT64", prediction["predicted_min_temp"]),
+                bigquery.ScalarQueryParameter("max_temp", "FLOAT64", prediction["predicted_max_temp"]),
+                bigquery.ScalarQueryParameter("uv", "FLOAT64", prediction["predicted_uv_index"]),
+                bigquery.ScalarQueryParameter("description", "STRING", prediction["predicted_description"]),
+                bigquery.ScalarQueryParameter("confidence", "FLOAT64", prediction["confidence_score"]),
+                bigquery.ScalarQueryParameter("trip_id", "STRING", trip_id)
+            ]
+        )
+        client.query(weather_query, weather_config).result()
+
+        return {"message": "Trip and weather data updated successfully"}
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
