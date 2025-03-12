@@ -150,6 +150,7 @@ async def get_trip_weather(trip_id: str, current_user: str = Depends(get_current
     trip_weather_data = [row for row in results][0]
     return trip_weather_data
 
+# delete  trip and the corresponding packing list, weather data, and trip information
 @router.delete("/delete/{trip_id}")
 async def delete_trip(trip_id: str, current_user: str = Depends(get_current_user)):
     try:
