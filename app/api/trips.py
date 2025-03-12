@@ -210,8 +210,6 @@ async def delete_trip(trip_id: str, current_user: str = Depends(get_current_user
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
-
-# NEED TO MAKE THE DEFAULT VALUES IN THE DICTIONARY TO THE VALUES ALREADY IN THE DATABASE 
 @router.put("/update/{trip_id}")
 async def update_trip(trip_id: str, trip: Trip, current_user: str = Depends(get_current_user)):
     try:
