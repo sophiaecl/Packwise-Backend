@@ -19,6 +19,7 @@ TRIP_DATASET_ID = os.getenv("TRIP_DATASET_ID")
 TRIP_TABLE_ID = os.getenv("TRIP_TABLE_ID")
 TRIP_WEATHER_TABLE_ID = os.getenv("TRIP_WEATHER_TABLE_ID")
 WEATHERSTACK_API_KEY = os.getenv("WEATHERSTACK_API_KEY")
+PACKING_TABLE_ID = os.getenv("PACKING_TABLE_ID")
 
 # create a Pydantic model for the trip data
 class Trip(BaseModel):
@@ -149,22 +150,63 @@ async def get_trip_weather(trip_id: str, current_user: str = Depends(get_current
     trip_weather_data = [row for row in results][0]
     return trip_weather_data
 
-# NEED TO DELETE DATA FROM TRIP WEATHER AND PACKING LISTS TABLE WHEN TRIP IS DELETED
 @router.delete("/delete/{trip_id}")
 async def delete_trip(trip_id: str, current_user: str = Depends(get_current_user)):
     try:
-        query = f"""
-        DELETE FROM `{TRIP_DATASET_ID}.{TRIP_TABLE_ID}`
-        WHERE trip_id = @trip_id AND user_id = @user_id
+        # First verify that the trip belongs to the user
+        trip_query = f"""
+            SELECT 1
+            FROM `{TRIP_DATASET_ID}.{TRIP_TABLE_ID}`
+            WHERE trip_id = @trip_id AND user_id = @user_id
         """
-        job_config = bigquery.QueryJobConfig(
+        trip_config = bigquery.QueryJobConfig(
+            query_parameters=[
+                bigquery.ScalarQueryParameter("trip_id", "STRING", trip_id),
+                bigquery.ScalarQueryParameter("user_id", "STRING", current_user)
+            ]
+        )
+        trip_job = client.query(trip_query, trip_config)
+        if trip_job.result().total_rows == 0:
+            raise HTTPException(status_code=404, detail="Trip not found or you don't have permission to delete it")
+        
+        # 1. Delete packing lists associated with the trip
+        packing_query = f"""
+            DELETE FROM `{TRIP_DATASET_ID}.{PACKING_TABLE_ID}`
+            WHERE trip_id = @trip_id
+        """
+        packing_config = bigquery.QueryJobConfig(
+            query_parameters=[
+                bigquery.ScalarQueryParameter("trip_id", "STRING", trip_id),
+            ]
+        )
+        client.query(packing_query, packing_config).result()
+        
+        # 2. Delete weather data associated with the trip
+        weather_query = f"""
+            DELETE FROM `{TRIP_DATASET_ID}.{TRIP_WEATHER_TABLE_ID}`
+            WHERE trip_id = @trip_id
+        """
+        weather_config = bigquery.QueryJobConfig(
+            query_parameters=[
+                bigquery.ScalarQueryParameter("trip_id", "STRING", trip_id),
+            ]
+        )
+        client.query(weather_query, weather_config).result()
+        
+        # 3. Finally delete the trip itself
+        trip_delete_query = f"""
+            DELETE FROM `{TRIP_DATASET_ID}.{TRIP_TABLE_ID}`
+            WHERE trip_id = @trip_id AND user_id = @user_id
+        """
+        trip_delete_config = bigquery.QueryJobConfig(
             query_parameters=[
                 bigquery.ScalarQueryParameter("trip_id", "STRING", trip_id),
                 bigquery.ScalarQueryParameter("user_id", "STRING", current_user),
             ]
         )
-        client.query(query, job_config=job_config).result()
-        return {"message": "Trip deleted successfully"}
+        client.query(trip_delete_query, trip_delete_config).result()
+        
+        return {"message": "Trip and all associated data deleted successfully"}
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
