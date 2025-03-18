@@ -155,5 +155,6 @@ class WeatherPredictor:
             'predicted_description': weather_description,
             'confidence_score': self._calculate_confidence(all_training_data),
             'years_analyzed': sorted(set(data['year'] for data in all_training_data)),
-            'days_analyzed': len(trip_dates)
+            'days_analyzed': len(trip_dates),
+            'historical_data': all_training_data 
         }
