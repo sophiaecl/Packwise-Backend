@@ -6,6 +6,7 @@ from app.services.weather_predictor import WeatherPredictor
 from app.api.auth import get_current_user
 import uuid
 import os 
+import json
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -19,6 +20,7 @@ TRIP_DATASET_ID = os.getenv("TRIP_DATASET_ID")
 TRIP_TABLE_ID = os.getenv("TRIP_TABLE_ID")
 TRIP_WEATHER_TABLE_ID = os.getenv("TRIP_WEATHER_TABLE_ID")
 WEATHERSTACK_API_KEY = os.getenv("WEATHERSTACK_API_KEY")
+HISTORICAL_WEATHER_TABLE = os.getenv("HISTORICAL_WEATHER_TABLE")
 PACKING_TABLE_ID = os.getenv("PACKING_TABLE_ID")
 
 # create a Pydantic model for the trip data
@@ -83,6 +85,15 @@ async def create_trip(trip: Trip, current_user: str = Depends(get_current_user))
         weather_errors = client.insert_rows_json(f"{TRIP_DATASET_ID}.{TRIP_WEATHER_TABLE_ID}", trip_weather_rows)
         if weather_errors:
             raise HTTPException(status_code=500, detail=str(weather_errors))
+        
+        historical_data_rows = [{
+            "trip_id": trip_data["trip_id"], 
+            "historical_stats": json.dumps(prediction["historical_data"], indent=2)  # contains the array of historical records
+        }]
+
+        historical_errors = client.insert_rows_json(f"{TRIP_DATASET_ID}.{HISTORICAL_WEATHER_TABLE}", historical_data_rows)
+        if historical_errors:
+            raise HTTPException(status_code=500, detail=str(historical_errors))
 
         # final message to return if everything is successful
         return {"message": "Trip created successfully", "trip_id": trip_data["trip_id"]}
@@ -150,6 +161,46 @@ async def get_trip_weather(trip_id: str, current_user: str = Depends(get_current
     trip_weather_data = [row for row in results][0]
     return trip_weather_data
 
+@router.get("/weather/historical/{trip_id}")
+async def get_historical_weather(trip_id: str, current_user: str = Depends(get_current_user)):
+    # verify that the trip belongs to the user
+    trip_query = f"""
+        SELECT 1
+        FROM `{TRIP_DATASET_ID}.{TRIP_TABLE_ID}`
+        WHERE trip_id = @trip_id AND user_id = @user_id
+    """
+    trip_config = bigquery.QueryJobConfig(
+        query_parameters=[
+            bigquery.ScalarQueryParameter("trip_id", "STRING", trip_id),
+            bigquery.ScalarQueryParameter("user_id", "STRING", current_user)
+        ]
+    )
+    trip_job = client.query(trip_query, trip_config)
+    if trip_job.result().total_rows == 0:
+        raise HTTPException(status_code=404, detail="Trip not found")
+
+    # get historical weather data
+    query = f"""
+        SELECT *
+        FROM `{TRIP_DATASET_ID}.{HISTORICAL_WEATHER_TABLE}`
+        WHERE trip_id = @trip_id
+    """
+    job_config = bigquery.QueryJobConfig(
+        query_parameters=[
+            bigquery.ScalarQueryParameter("trip_id", "STRING", trip_id)
+        ]
+    )
+    query_job = client.query(query, job_config=job_config)
+    results = query_job.result()
+
+    if results.total_rows == 0:
+        raise HTTPException(status_code=404, detail="Historical weather data not found")
+
+    data = [row for row in results][0]
+    historical_data = json.loads(data.historical_stats)
+
+    return {"trip_id": data.trip_id, "historical_data": historical_data}
+
 @router.delete("/delete/{trip_id}")
 async def delete_trip(trip_id: str, current_user: str = Depends(get_current_user)):
     try:
@@ -192,8 +243,20 @@ async def delete_trip(trip_id: str, current_user: str = Depends(get_current_user
             ]
         )
         client.query(weather_query, weather_config).result()
+
+        # 3. Delete historical weather data associated with the trip
+        historical_query = f"""
+            DELETE FROM `{TRIP_DATASET_ID}.{HISTORICAL_WEATHER_TABLE}`
+            WHERE trip_id = @trip_id
+        """
+        historical_config = bigquery.QueryJobConfig(
+            query_parameters=[
+                bigquery.ScalarQueryParameter("trip_id", "STRING", trip_id),
+            ]
+        )
+        client.query(historical_query, historical_config).result()
         
-        # 3. Finally delete the trip itself
+        # 4. Finally delete the trip itself
         trip_delete_query = f"""
             DELETE FROM `{TRIP_DATASET_ID}.{TRIP_TABLE_ID}`
             WHERE trip_id = @trip_id AND user_id = @user_id
@@ -208,7 +271,7 @@ async def delete_trip(trip_id: str, current_user: str = Depends(get_current_user
         
         return {"message": "Trip and all associated data deleted successfully"}
     except Exception as e:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.put("/update/{trip_id}")
 async def update_trip(trip_id: str, trip: Trip, current_user: str = Depends(get_current_user)):
@@ -289,5 +352,5 @@ async def update_trip(trip_id: str, trip: Trip, current_user: str = Depends(get_
 
         return {"message": "Trip and weather data updated successfully"}
     except Exception as e:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e))
 

@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.api import auth, trips, dashboard, packing
+from app.api import auth, trips, dashboard, packing, packing_recommender
 import os
 from dotenv import load_dotenv
 
@@ -22,6 +22,7 @@ app.include_router(auth.router, prefix="/auth", tags=["Authentication"])
 app.include_router(dashboard.router, prefix="/dashboard", tags=["Dashboard"])
 app.include_router(trips.router, prefix="/trips", tags=["Trips"])
 app.include_router(packing.router, prefix="/packing", tags=["Packing"])
+app.include_router(packing_recommender.router, prefix="/packing_recommendations", tags=["Packing Recommendations"])
 
 @app.get("/")
 def home():

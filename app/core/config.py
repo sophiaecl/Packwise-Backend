@@ -15,6 +15,7 @@ class Config:
     USER_INFO_TABLE_ID = "users_info"
     TRIP_TABLE_ID = "user_trips"
     TRIP_WEATHER_TABLE_ID = "trip_weather"
+    HISTORICAL_WEATHER_TABLE = "trip_historical_weather"
     PACKING_TABLE_ID = "packing_lists"
 
 config = Config()
