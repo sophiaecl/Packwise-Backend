@@ -243,8 +243,20 @@ async def delete_trip(trip_id: str, current_user: str = Depends(get_current_user
             ]
         )
         client.query(weather_query, weather_config).result()
+
+        # 3. Delete historical weather data associated with the trip
+        historical_query = f"""
+            DELETE FROM `{TRIP_DATASET_ID}.{HISTORICAL_WEATHER_TABLE}`
+            WHERE trip_id = @trip_id
+        """
+        historical_config = bigquery.QueryJobConfig(
+            query_parameters=[
+                bigquery.ScalarQueryParameter("trip_id", "STRING", trip_id),
+            ]
+        )
+        client.query(historical_query, historical_config).result()
         
-        # 3. Finally delete the trip itself
+        # 4. Finally delete the trip itself
         trip_delete_query = f"""
             DELETE FROM `{TRIP_DATASET_ID}.{TRIP_TABLE_ID}`
             WHERE trip_id = @trip_id AND user_id = @user_id
@@ -259,7 +271,7 @@ async def delete_trip(trip_id: str, current_user: str = Depends(get_current_user
         
         return {"message": "Trip and all associated data deleted successfully"}
     except Exception as e:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.put("/update/{trip_id}")
 async def update_trip(trip_id: str, trip: Trip, current_user: str = Depends(get_current_user)):
@@ -340,5 +352,5 @@ async def update_trip(trip_id: str, trip: Trip, current_user: str = Depends(get_
 
         return {"message": "Trip and weather data updated successfully"}
     except Exception as e:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e))
 

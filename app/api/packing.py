@@ -111,3 +111,40 @@ async def get_packing_lists(trip_id: str, current_user: str = Depends(get_curren
         raise HTTPException(status_code=404, detail="No packing lists found for this trip")
     
     return {"packing_lists": results.to_dict(orient="records")}
+
+@router.delete("/{packing_list_id}")
+async def delete_packing_list(packing_list_id: str, current_user: str = Depends(get_current_user)):
+    try:
+        # verify the packing list belongs to the current user
+        trip_query = f"""
+            SELECT t.trip_id, t.user_id 
+            FROM `{TRIP_DATASET_ID}.{PACKING_TABLE_ID}` p
+            JOIN `{TRIP_DATASET_ID}.{TRIP_TABLE_ID}` t ON p.trip_id = t.trip_id
+            WHERE p.list_id = @list_id
+        """
+        job_config = bigquery.QueryJobConfig(
+            query_parameters=[
+                bigquery.ScalarQueryParameter("list_id", "STRING", packing_list_id),
+                bigquery.ScalarQueryParameter("user_id", "STRING", current_user),
+            ]
+        )
+        list_results = client.query(trip_query, job_config=job_config).result()
+        if list_results.total_rows == 0:
+            raise HTTPException(status_code=404, detail="Packing list not found")
+        
+        # delete the packing list
+        list_query = f"""
+            DELETE FROM `{TRIP_DATASET_ID}.{PACKING_TABLE_ID}` 
+            WHERE list_id = '{packing_list_id}'
+        """
+        list_config = bigquery.QueryJobConfig(
+            query_parameters=[
+                bigquery.ScalarQueryParameter("list_id", "STRING", packing_list_id),
+            ]
+        )
+        client.query(list_query, list_config).result()
+
+        return {"message": "Packing list deleted successfully"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
