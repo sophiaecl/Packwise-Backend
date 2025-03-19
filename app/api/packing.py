@@ -6,6 +6,8 @@ import uuid
 import json
 from app.services.packing_list_generator import generate_packing_list
 from app.api.auth import get_current_user
+from pydantic import BaseModel
+from typing import Dict, Any, List, Optional, Union
 
 load_dotenv()
 
@@ -13,6 +15,9 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 TRIP_DATASET_ID = os.getenv("TRIP_DATASET_ID")
 TRIP_TABLE_ID = os.getenv("TRIP_TABLE_ID")
 PACKING_TABLE_ID = os.getenv("PACKING_TABLE_ID")
+
+class PackingListUpdate(BaseModel):
+    packing_list: Dict[str, Any]
 
 router = APIRouter()
 
@@ -147,4 +152,55 @@ async def delete_packing_list(packing_list_id: str, current_user: str = Depends(
         return {"message": "Packing list deleted successfully"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+    
 
+@router.put("/{list_id}")
+async def update_packing_list(list_id: str, update_data: PackingListUpdate, current_user: str = Depends(get_current_user)):
+    try:
+        # First verify the packing list belongs to the current user
+        trip_query = f"""
+            SELECT t.trip_id, t.user_id 
+            FROM `{TRIP_DATASET_ID}.{PACKING_TABLE_ID}` p
+            JOIN `{TRIP_DATASET_ID}.{TRIP_TABLE_ID}` t ON p.trip_id = t.trip_id
+            WHERE p.list_id = @list_id
+        """
+        job_config = bigquery.QueryJobConfig(
+            query_parameters=[
+                bigquery.ScalarQueryParameter("list_id", "STRING", list_id),
+            ]
+        )
+        trip_results = client.query(trip_query, job_config=job_config).result()
+        
+        if trip_results.total_rows == 0:
+            raise HTTPException(status_code=404, detail="Packing list not found")
+        
+        trip_data = [row for row in trip_results][0]
+        
+        # Verify the trip belongs to the current user
+        if trip_data["user_id"] != current_user:
+            raise HTTPException(status_code=403, detail="Access denied")
+        
+        # Serialize the packing list to a JSON string
+        packing_list_json = json.dumps(update_data.packing_list)
+        
+        # Update the packing list in the database
+        update_query = f"""
+            UPDATE `{TRIP_DATASET_ID}.{PACKING_TABLE_ID}`
+            SET packing_list = @packing_list
+            WHERE list_id = @list_id
+        """
+        update_config = bigquery.QueryJobConfig(
+            query_parameters=[
+                bigquery.ScalarQueryParameter("packing_list", "STRING", packing_list_json),
+                bigquery.ScalarQueryParameter("list_id", "STRING", list_id),
+            ]
+        )
+        client.query(update_query, update_config).result()
+        
+        return {
+            "message": "Packing list updated successfully",
+            "list_id": list_id
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to update packing list: {str(e)}")
