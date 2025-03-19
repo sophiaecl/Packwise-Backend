@@ -154,8 +154,8 @@ async def delete_packing_list(packing_list_id: str, current_user: str = Depends(
         raise HTTPException(status_code=500, detail=str(e))
     
 
-@router.put("/{list_id}")
-async def update_packing_list(list_id: str, update_data: PackingListUpdate, current_user: str = Depends(get_current_user)):
+@router.put("/{packing_list_id}")
+async def update_packing_list(packing_list_id: str, update_data: PackingListUpdate, current_user: str = Depends(get_current_user)):
     try:
         # First verify the packing list belongs to the current user
         trip_query = f"""
@@ -166,7 +166,7 @@ async def update_packing_list(list_id: str, update_data: PackingListUpdate, curr
         """
         job_config = bigquery.QueryJobConfig(
             query_parameters=[
-                bigquery.ScalarQueryParameter("list_id", "STRING", list_id),
+                bigquery.ScalarQueryParameter("list_id", "STRING", packing_list_id),
             ]
         )
         trip_results = client.query(trip_query, job_config=job_config).result()
@@ -192,14 +192,14 @@ async def update_packing_list(list_id: str, update_data: PackingListUpdate, curr
         update_config = bigquery.QueryJobConfig(
             query_parameters=[
                 bigquery.ScalarQueryParameter("packing_list", "STRING", packing_list_json),
-                bigquery.ScalarQueryParameter("list_id", "STRING", list_id),
+                bigquery.ScalarQueryParameter("list_id", "STRING", packing_list_id),
             ]
         )
         client.query(update_query, update_config).result()
         
         return {
             "message": "Packing list updated successfully",
-            "list_id": list_id
+            "list_id": packing_list_id
         }
         
     except Exception as e:

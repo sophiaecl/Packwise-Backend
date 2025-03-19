@@ -256,12 +256,8 @@ def categorize_recommendations(recommendations: List[Dict[str, Any]]) -> Dict[st
     # Remove empty categories
     return {category: items for category, items in categorized.items() if items}
 
-@router.get("/{list_id}", response_model=dict)
-async def get_packing_recommendations_for_list(
-    list_id: str, 
-    similarity_threshold: float = 0.7,
-    current_user: str = Depends(get_current_user)
-):
+@router.get("/{packing_list_id}", response_model=dict)
+async def get_packing_recommendations_for_list(packing_list_id: str, similarity_threshold: float = 0.7, current_user: str = Depends(get_current_user)):
     """
     Get packing recommendations based on similar trips for a specific packing list.
     
@@ -274,7 +270,7 @@ async def get_packing_recommendations_for_list(
     """
     try:
         # Get trip information for this packing list
-        trip_info = get_packing_list_trip_info(list_id, current_user)
+        trip_info = get_packing_list_trip_info(packing_list_id, current_user)
         
         # Get user's current packing list items
         user_items = extract_items_from_packing_list(trip_info.packing_list)
