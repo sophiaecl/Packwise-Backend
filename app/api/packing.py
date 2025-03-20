@@ -177,6 +177,59 @@ async def get_packing_progress(packing_list_id: str, current_user: str = Depends
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@router.get("/progress/all/")
+async def get_all_packing_progress(current_user: str = Depends(get_current_user)):
+    """Fetches the average progress for all packing lists across all trips for the user."""
+    try:
+        # Query all packing lists for the user
+        query = f"""
+            SELECT p.packing_list 
+            FROM `{TRIP_DATASET_ID}.{PACKING_TABLE_ID}` p
+            JOIN `{TRIP_DATASET_ID}.{TRIP_TABLE_ID}` t ON p.trip_id = t.trip_id
+            WHERE t.user_id = @user_id
+        """
+        job_config = bigquery.QueryJobConfig(
+            query_parameters=[
+                bigquery.ScalarQueryParameter("user_id", "STRING", current_user),
+            ]
+        )
+        results = client.query(query, job_config=job_config).to_dataframe()
+
+        if results.empty:
+            raise HTTPException(status_code=404, detail="No packing lists found for the user")
+
+        # Calculate progress for each packing list
+        total_progress = 0
+        list_count = 0
+
+        for _, row in results.iterrows():
+            packing_list_str = row.get("packing_list", "[]")
+            try:
+                packing_list = json.loads(packing_list_str)
+            except json.JSONDecodeError:
+                continue  # Skip invalid packing lists
+
+            total_items = packing_list.get("total_items")
+            if total_items == 0:
+                continue  # Skip lists with no items
+
+            packed_items = sum(
+                1 for category in packing_list["categories"]
+                for item in category["items"] if item.get("packed") == True
+            )
+            total_progress += (packed_items / total_items) * 100
+            list_count += 1
+
+        if list_count == 0:
+            raise HTTPException(status_code=404, detail="No valid packing lists found")
+
+        # Calculate average progress
+        average_progress = round(total_progress / list_count, 2)
+
+        return {"average_progress": average_progress}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @router.delete("/{packing_list_id}")
 async def delete_packing_list(packing_list_id: str, current_user: str = Depends(get_current_user)):
     try:
