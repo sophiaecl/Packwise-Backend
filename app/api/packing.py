@@ -117,6 +117,66 @@ async def get_packing_lists(trip_id: str, current_user: str = Depends(get_curren
     
     return {"packing_lists": results.to_dict(orient="records")}
 
+@router.get("/progress/{packing_list_id}")
+async def get_packing_progress(packing_list_id: str, current_user: str = Depends(get_current_user)):
+    try: 
+        # First get the trip_id associated with this packing list
+        trip_query = f"""
+            SELECT t.trip_id, t.user_id 
+            FROM `{TRIP_DATASET_ID}.{PACKING_TABLE_ID}` p
+            JOIN `{TRIP_DATASET_ID}.{TRIP_TABLE_ID}` t ON p.trip_id = t.trip_id
+            WHERE p.list_id = @list_id
+        """
+        job_config = bigquery.QueryJobConfig(
+            query_parameters=[
+                bigquery.ScalarQueryParameter("list_id", "STRING", packing_list_id),
+            ]
+        )
+        trip_results = client.query(trip_query, job_config=job_config).result()
+        
+        if trip_results.total_rows == 0:
+            raise HTTPException(status_code=404, detail="Packing list not found")
+        
+        trip_data = [row for row in trip_results][0]
+        
+        # Verify the trip belongs to the current user
+        if trip_data["user_id"] != current_user:
+            raise HTTPException(status_code=403, detail="Access denied")
+        
+        # Get the packing list
+        query = f'''
+            SELECT packing_list FROM `{TRIP_DATASET_ID}.{PACKING_TABLE_ID}` WHERE list_id = '{packing_list_id}'
+        '''
+        results = client.query(query).to_dataframe()
+        if results.empty:
+            raise HTTPException(status_code=404, detail="list not found")
+        
+        row = results.iloc[0].to_dict()
+        packing_list_str = row.get("packing_list", "[]")
+
+        try:
+            packing_list = json.loads(packing_list_str)
+        except json.JSONDecodeError:
+            raise HTTPException(status_code=500, detail="Packing list contains invalid JSON format.")
+        
+        # Calculate the progress
+        total_items = packing_list.get("total_items")
+        packed_items = 0
+        for category in packing_list["categories"]:
+            for item in category["items"]:
+                if item.get("packed") == True:
+                    packed_items += 1
+        
+        progress = {
+            "total_items": total_items,
+            "packed_items": packed_items,
+            "progress": round(packed_items / total_items * 100, 2)
+        }
+        
+        return progress
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @router.delete("/{packing_list_id}")
 async def delete_packing_list(packing_list_id: str, current_user: str = Depends(get_current_user)):
     try:

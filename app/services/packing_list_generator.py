@@ -56,6 +56,7 @@ def generate_packing_list(trip_id):
               "name": string,
               "quantity": int,
               "essential": boolean,
+              "packed": false
               "notes": string
             }}
           ]
