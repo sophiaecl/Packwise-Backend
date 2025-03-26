@@ -11,7 +11,7 @@ app = FastAPI(title="PackWise API", description="Backend for PackWise travel ass
 # Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:3000", "https://packwise-frontend-580624387675.europe-southwest1.run.app", "https://packwise-frontend-jk6n3yy7fa-no.a.run.app"],  # Add your React frontend URL
+    allow_origins=["http://localhost:5173", "http://localhost:3000", "https://packwise-frontend-580624387675.europe-southwest1.run.app", "https://packwise-frontend-jk6n3yy7fa-no.a.run.app"],
     allow_credentials=True,
     allow_methods=["*"],  # Allows all methods
     allow_headers=["*"],  # Allows all headers
